@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="raspi_process_readfile" name="Raspberry Pi Read File (No Cache) Process" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>SequenceFlow_0y987ug</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="SequenceFlow_0y987ug" sourceRef="StartEvent_1" targetRef="ParallelGateway_0zj7nxj" />
+    <bpmn:parallelGateway id="ParallelGateway_0zj7nxj">
+      <bpmn:incoming>SequenceFlow_0y987ug</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_1y6yh9y</bpmn:outgoing>
+      <bpmn:outgoing>SequenceFlow_1e20xgn</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="SequenceFlow_1y6yh9y" sourceRef="ParallelGateway_0zj7nxj" targetRef="ScriptTask_1l0dtgl" />
+    <bpmn:sequenceFlow id="SequenceFlow_1e20xgn" sourceRef="ParallelGateway_0zj7nxj" targetRef="ScriptTask_036v4tu" />
+    <bpmn:sequenceFlow id="SequenceFlow_0io26h4" sourceRef="ScriptTask_036v4tu" targetRef="ScriptTask_0om39cd" />
+    <bpmn:sequenceFlow id="SequenceFlow_0mexicy" sourceRef="ScriptTask_1l0dtgl" targetRef="ScriptTask_0m1vvit" />
+    <bpmn:sequenceFlow id="SequenceFlow_18pha06" sourceRef="ScriptTask_0m1vvit" targetRef="ParallelGateway_0qfkwf4" />
+    <bpmn:parallelGateway id="ParallelGateway_0qfkwf4">
+      <bpmn:incoming>SequenceFlow_18pha06</bpmn:incoming>
+      <bpmn:incoming>SequenceFlow_0881by4</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_1owqc6b</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="SequenceFlow_0881by4" sourceRef="ScriptTask_0om39cd" targetRef="ParallelGateway_0qfkwf4" />
+    <bpmn:endEvent id="EndEvent_0ezcaoo" name="End">
+      <bpmn:incoming>SequenceFlow_1owqc6b</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="SequenceFlow_1owqc6b" sourceRef="ParallelGateway_0qfkwf4" targetRef="EndEvent_0ezcaoo" />
+    <bpmn:dataObjectReference id="DataObjectReference_bt_list" name="File_Line" dataObjectRef="DataObject_1kuv5d0" />
+    <bpmn:dataObject id="DataObject_1kuv5d0" />
+    <bpmn:dataObjectReference id="DataObjectReference_cpu_temp" name="CPU_Temperature" dataObjectRef="DataObject_0yzg26j" />
+    <bpmn:dataObject id="DataObject_0yzg26j" />
+    <bpmn:scriptTask id="ScriptTask_1l0dtgl" name="Read File" scriptFormat="groovy" camunda:resultVariable="file_line">
+      <bpmn:incoming>SequenceFlow_1y6yh9y</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_0mexicy</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_10ftvu2">
+        <bpmn:targetRef>DataObjectReference_bt_list</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:script><![CDATA[println ("[BPMN] READ FILE TASK")
+	  
+	  println "Groovy " + GroovySystem.version
+long startTime = System.currentTimeMillis()
+String fileContents = new File('/home/pi/Documents/33k.txt').text
+
+//Read one line
+Scanner scanner = new Scanner(fileContents);
+String line = scanner.nextLine();
+scanner.close();
+
+long stopTime = System.currentTimeMillis()
+long spentTime = stopTime - startTime
+
+println "File read in ${spentTime} ms"
+line]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="ScriptTask_036v4tu" name="Get CPU Temperature" scriptFormat="groovy" camunda:resultVariable="cpu_temp">
+      <bpmn:incoming>SequenceFlow_1e20xgn</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_0io26h4</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssociation_0pbj705">
+        <bpmn:targetRef>DataObjectReference_cpu_temp</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:script><![CDATA[println ("[BPMN] GET CPU TEMPERATURE TASK")
+
+def hostname = InetAddress.getLocalHost().getHostName();
+def temp = null;
+if (hostname.equals("mclab-pi")) {
+	temp  = "vcgencmd measure_temp".execute()
+	temp=temp.text.replaceAll("temp=", "");
+} else {
+	temp = "33.33"
+}
+
+temp=temp.replaceAll("'C\n", "")
+println temp
+temp]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="ScriptTask_0m1vvit" name="Send using MQTT" scriptFormat="groovy">
+      <bpmn:incoming>SequenceFlow_0mexicy</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_18pha06</bpmn:outgoing>
+      <bpmn:property id="Property_17ev68s" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssociation_05jlvhf">
+        <bpmn:sourceRef>DataObjectReference_bt_list</bpmn:sourceRef>
+        <bpmn:targetRef>Property_17ev68s</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:script><![CDATA[println ("[BPMN] SEND USING MQTT TASK")
+
+@GrabResolver(name='Paho', root='https://repo.eclipse.org/content/repositories/paho-releases/')
+@Grab(group='org.eclipse.paho', module='mqtt-client', version='0.4.0')
+
+import org.eclipse.paho.client.mqttv3.MqttClient
+import org.eclipse.paho.client.mqttv3.MqttMessage
+import org.eclipse.paho.client.mqttv3.MqttException
+import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence
+
+String tmpDir = System.getProperty("java.io.tmpdir")
+MqttDefaultFilePersistence dataStore = new MqttDefaultFilePersistence(tmpDir)
+
+MqttClient client = new MqttClient("tcp://172.17.124.117:1883", "PublisherClient", dataStore)
+client.connect()
+MqttMessage message = new MqttMessage('Hello world!!'.bytes)
+message.setQos(0)
+print "publishing.."
+long startTime = System.currentTimeMillis()
+
+
+
+client.publish('topic', file_line.bytes, 0, false)
+
+client.publish('/exit', 'Exit'.bytes, 0, false)
+long stopTime = System.currentTimeMillis()
+long spentTime = stopTime -startTime
+println "published in ${spentTime} ms"
+client.disconnect()
+println "disconnected"]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="ScriptTask_0om39cd" name="Send using HTTP" scriptFormat="groovy">
+      <bpmn:incoming>SequenceFlow_0io26h4</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_0881by4</bpmn:outgoing>
+      <bpmn:property id="Property_0i6btvp" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssociation_1744ex3">
+        <bpmn:sourceRef>DataObjectReference_cpu_temp</bpmn:sourceRef>
+        <bpmn:targetRef>Property_0i6btvp</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:script><![CDATA[println ("[BPMN] SEND USING HTTP TASK")
+@Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7' )
+
+import groovyx.net.http.HTTPBuilder
+import static groovyx.net.http.ContentType.*
+import static groovyx.net.http.Method.*
+
+def http = new HTTPBuilder('http://172.17.124.117:9090/')
+http.request( POST ) {
+    uri.path = '/virtualthing/debug'
+    send URLENC, [temp: cpu_temp]
+
+    response.success = { resp, reader ->
+        println "POST response status: ${resp.statusLine}"
+		println resp.getAllHeaders()
+		println resp.contentType
+		println reader.text
+    }
+}]]></bpmn:script>
+    </bpmn:scriptTask>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="raspi_process_readfile">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="282" y="229" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="255" y="265" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_0y987ug_di" bpmnElement="SequenceFlow_0y987ug">
+        <di:waypoint xsi:type="dc:Point" x="318" y="247" />
+        <di:waypoint xsi:type="dc:Point" x="365" y="247" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="213" y="237" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ParallelGateway_0zj7nxj_di" bpmnElement="ParallelGateway_0zj7nxj">
+        <dc:Bounds x="365" y="222" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="272" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_1y6yh9y_di" bpmnElement="SequenceFlow_1y6yh9y">
+        <di:waypoint xsi:type="dc:Point" x="390" y="222" />
+        <di:waypoint xsi:type="dc:Point" x="390" y="163" />
+        <di:waypoint xsi:type="dc:Point" x="439" y="163" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="295" y="182.5" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_1e20xgn_di" bpmnElement="SequenceFlow_1e20xgn">
+        <di:waypoint xsi:type="dc:Point" x="390" y="272" />
+        <di:waypoint xsi:type="dc:Point" x="390" y="335" />
+        <di:waypoint xsi:type="dc:Point" x="439" y="335" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="295" y="293.5" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_0io26h4_di" bpmnElement="SequenceFlow_0io26h4">
+        <di:waypoint xsi:type="dc:Point" x="539" y="335" />
+        <di:waypoint xsi:type="dc:Point" x="660" y="335" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="554.5" y="325" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_0mexicy_di" bpmnElement="SequenceFlow_0mexicy">
+        <di:waypoint xsi:type="dc:Point" x="539" y="163" />
+        <di:waypoint xsi:type="dc:Point" x="660" y="163" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="554.5" y="153" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_18pha06_di" bpmnElement="SequenceFlow_18pha06">
+        <di:waypoint xsi:type="dc:Point" x="760" y="163" />
+        <di:waypoint xsi:type="dc:Point" x="846" y="163" />
+        <di:waypoint xsi:type="dc:Point" x="846" y="222" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="758" y="153" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ParallelGateway_0qfkwf4_di" bpmnElement="ParallelGateway_0qfkwf4">
+        <dc:Bounds x="821" y="222" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="801" y="272" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_0881by4_di" bpmnElement="SequenceFlow_0881by4">
+        <di:waypoint xsi:type="dc:Point" x="760" y="335" />
+        <di:waypoint xsi:type="dc:Point" x="846" y="335" />
+        <di:waypoint xsi:type="dc:Point" x="846" y="272" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="758" y="325" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="EndEvent_0ezcaoo_di" bpmnElement="EndEvent_0ezcaoo">
+        <dc:Bounds x="939" y="229" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="912" y="265" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_1owqc6b_di" bpmnElement="SequenceFlow_1owqc6b">
+        <di:waypoint xsi:type="dc:Point" x="871" y="247" />
+        <di:waypoint xsi:type="dc:Point" x="939" y="247" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="875.5" y="237" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="DataObjectReference_1nyv14u_di" bpmnElement="DataObjectReference_bt_list">
+        <dc:Bounds x="578" y="47" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="551" y="97" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_10ftvu2_di" bpmnElement="DataOutputAssociation_10ftvu2">
+        <di:waypoint xsi:type="dc:Point" x="489" y="123" />
+        <di:waypoint xsi:type="dc:Point" x="489" y="72" />
+        <di:waypoint xsi:type="dc:Point" x="578" y="72" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_05jlvhf_di" bpmnElement="DataInputAssociation_05jlvhf">
+        <di:waypoint xsi:type="dc:Point" x="614" y="72" />
+        <di:waypoint xsi:type="dc:Point" x="710" y="72" />
+        <di:waypoint xsi:type="dc:Point" x="710" y="123" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="DataObjectReference_1kpr8y5_di" bpmnElement="DataObjectReference_cpu_temp">
+        <dc:Bounds x="578" y="413" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="551" y="463" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DataOutputAssociation_0pbj705_di" bpmnElement="DataOutputAssociation_0pbj705">
+        <di:waypoint xsi:type="dc:Point" x="489" y="375" />
+        <di:waypoint xsi:type="dc:Point" x="489" y="438" />
+        <di:waypoint xsi:type="dc:Point" x="578" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_1744ex3_di" bpmnElement="DataInputAssociation_1744ex3">
+        <di:waypoint xsi:type="dc:Point" x="614" y="438" />
+        <di:waypoint xsi:type="dc:Point" x="710" y="438" />
+        <di:waypoint xsi:type="dc:Point" x="710" y="375" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ScriptTask_1l0dtgl_di" bpmnElement="ScriptTask_1l0dtgl">
+        <dc:Bounds x="439" y="123" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ScriptTask_036v4tu_di" bpmnElement="ScriptTask_036v4tu">
+        <dc:Bounds x="439" y="295" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ScriptTask_0m1vvit_di" bpmnElement="ScriptTask_0m1vvit">
+        <dc:Bounds x="660" y="123" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ScriptTask_0om39cd_di" bpmnElement="ScriptTask_0om39cd">
+        <dc:Bounds x="660" y="295" width="100" height="80" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
